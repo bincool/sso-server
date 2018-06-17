@@ -1,0 +1,35 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+		"http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="UserMapper">
+
+	<!-- 通过user_id获取数据 -->
+	<select id="queryUserByLoginName" parameterType="io.github.bincool.entity.system.user.User" resultType="io.github.bincool.entity.system.user.User" useCache="false">
+		select
+		USER_ID as userId,
+		<trim suffixOverrides=",">
+			LOGIN_NAME as loginName,
+			LOGIN_PASSWORD as loginPassword,
+			ORGANIZATION_ID as organizationId,
+			SUB_ORGANIZATION_ID as subOrganizationId,
+			TYPE as type,
+			USERNAME as username,
+			MOBILE as mobile,
+			EMAIL as email,
+			LOGIN_IP as loginIp,
+			LOGIN_TIME as loginTime,
+			LOGIN_COUNT as loginCount,
+			STATUS as status,
+			CREATE_TIME as createTime,
+		</trim>
+		from
+		SYS_USER
+		<where>
+			LOGIN_NAME = #{loginName}
+			<if test="status != null and status !=''">
+				and STATUS = #{status}
+			</if>
+		</where>
+	</select>
+
+</mapper>

@@ -1,0 +1,165 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<beans xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+       xmlns:p="http://www.springframework.org/schema/p"
+       xmlns:c="http://www.springframework.org/schema/c"
+       xmlns:util="http://www.springframework.org/schema/util"
+       xmlns:aop="http://www.springframework.org/schema/aop"
+       xmlns:context="http://www.springframework.org/schema/context"
+       xmlns="http://www.springframework.org/schema/beans"
+       xsi:schemaLocation="http://www.springframework.org/schema/beans http://www.springframework.org/schema/beans/spring-beans.xsd
+        http://www.springframework.org/schema/context http://www.springframework.org/schema/context/spring-context.xsd
+        http://www.springframework.org/schema/aop http://www.springframework.org/schema/aop/spring-aop.xsd
+        http://www.springframework.org/schema/util http://www.springframework.org/schema/util/spring-util.xsd">
+    <description>
+        This is the main Spring configuration file with some of the main "core" classes defined. You shouldn't really
+        modify this unless you know what you're doing!
+    </description>
+
+    <!--
+    | The base-package indicates where components stored. Spring will scan this
+    | folder and find out the annotated beans and register it in Spring container.
+    -->
+    <context:component-scan base-package="org.jasig.cas" />
+    <!-- 自动扫描 -->
+    <context:component-scan base-package="io.github.bincool" />
+    <context:annotation-config/>
+
+    <!--
+      Including this aspectj-autoproxy element will cause spring to automatically
+      create proxies around any beans defined in this file that match the pointcuts
+      of any aspects defined in this file.
+    -->
+    <aop:aspectj-autoproxy/>
+
+    <!-- ADVISORS -->
+    <bean id="advisorAutoProxyCreator"
+          class="org.springframework.aop.framework.autoproxy.DefaultAdvisorAutoProxyCreator"/>
+
+    <!-- CAS Application Context Configuration -->
+    <util:list id="serviceFactoryList" value-type="org.jasig.cas.authentication.principal.ServiceFactory">
+        <ref bean="webApplicationServiceFactory" />
+    </util:list>
+
+    <util:list id="argumentExtractors">
+        <ref bean="defaultArgumentExtractor"/>
+    </util:list>
+
+    <util:map id="uniqueIdGeneratorsMap">
+        <entry
+            key="org.jasig.cas.authentication.principal.SimpleWebApplicationServiceImpl"
+            value-ref="serviceTicketUniqueIdGenerator" />
+    </util:map>
+
+    <bean id="passThroughController" class="org.springframework.web.servlet.mvc.UrlFilenameViewController"/>
+
+    <bean id="handlerMappingC" class="org.springframework.web.servlet.handler.SimpleUrlHandlerMapping"
+          p:order="1000"
+          p:alwaysUseFullPath="true">
+        <property name="mappings">
+            <util:properties>
+                <prop key="/authorizationFailure.html">passThroughController</prop>
+                <prop key="/statistics/ping">pingController</prop>
+                <prop key="/statistics/threads">threadsController</prop>
+                <prop key="/statistics/metrics">metricsController</prop>
+                <prop key="/statistics/healthcheck">healthController</prop>
+
+                <!-- 自定义controller -->
+                <prop key="/ctl/captcha.png">imgCodeController</prop>
+                <prop key="/ctl/welcome.html">welcomeController</prop>
+            </util:properties>
+        </property>
+    </bean>
+
+    <!-- 多请求处理控制器 -->
+    <bean id="paraMethodResolver"
+          class="org.springframework.web.servlet.mvc.multiaction.ParameterMethodNameResolver">
+        <property name="paramName">
+            <value>method</value>
+        </property>
+    </bean>
+
+    <bean id="welcomeController" class="io.github.bincool.controller.api.curl.WelcomeController">
+        <property name="methodNameResolver">
+            <ref bean="paraMethodResolver"/>
+        </property>
+        <property name="successView">
+            <value>ctl/welcome</value>
+        </property>
+    </bean>
+
+    <!-- 自定义controller-图形验证码 -->
+    <bean id="imgCodeController" class="io.github.bincool.controller.system.seccode.ImgCodeController" />
+
+    <bean id="healthController" class="org.springframework.web.servlet.mvc.ServletWrappingController">
+        <property name="servletClass">
+            <value>com.codahale.metrics.servlets.HealthCheckServlet</value>
+        </property>
+        <property name="servletName">
+            <value>healthServlet</value>
+        </property>
+    </bean>
+    
+    <bean id="metricsController" class="org.springframework.web.servlet.mvc.ServletWrappingController">
+        <property name="servletClass">
+            <value>com.codahale.metrics.servlets.MetricsServlet</value>
+        </property>
+        <property name="servletName">
+            <value>metricsServlet</value>
+        </property>
+    </bean>
+    
+    <bean id="pingController" class="org.springframework.web.servlet.mvc.ServletWrappingController">
+        <property name="servletClass">
+            <value>com.codahale.metrics.servlets.PingServlet</value>
+        </property>
+        <property name="servletName">
+            <value>ping</value>
+        </property>
+    </bean>
+
+    <bean id="threadsController" class="org.springframework.web.servlet.mvc.ServletWrappingController">
+        <property name="servletClass">
+            <value>com.codahale.metrics.servlets.ThreadDumpServlet</value>
+        </property>
+        <property name="servletName">
+            <value>threads</value>
+        </property>
+    </bean>
+    
+    <!-- The Quartz scheduler used by any scheduled tasks -->
+    <bean id="scheduler" class="org.springframework.scheduling.quartz.SchedulerFactoryBean"
+        p:waitForJobsToCompleteOnShutdown="${scheduler.shutdown.wait:true}">
+        <property name="jobFactory">
+            <bean class="org.jasig.cas.util.CasSpringBeanJobFactory" />
+        </property>
+        <property name="quartzProperties">
+            <props>
+                <prop key="org.quartz.scheduler.interruptJobsOnShutdown">${scheduler.shutdown.interruptJobs:true}</prop>
+                <prop key="org.quartz.scheduler.interruptJobsOnShutdownWithWait">
+                    ${scheduler.shutdown.interruptJobs:true}
+                </prop>
+            </props>
+        </property>
+    </bean>
+    
+    <bean id="ticketTransactionManager" 
+          class="org.jasig.cas.util.PseudoTransactionManager" />
+
+    <!-- 引入配置文件 -->
+    <!--示例代码-->
+    <!--@Value("#{configProperties['sftp_username']}")-->
+    <!--private String username;-->
+    <bean id="configProperties" class="org.springframework.beans.factory.config.PropertiesFactoryBean">
+        <property name="locations">
+            <list>
+                <value>classpath:/properties/*.properties</value>
+            </list>
+        </property>
+    </bean>
+    <bean id="propertyConfigurer" class="org.springframework.beans.factory.config.PreferencesPlaceholderConfigurer">
+        <property name="properties" ref="configProperties" />
+    </bean>
+
+    <!-- 静态资源版本号 -->
+    <bean id="resourceVersion" class="io.github.bincool.util.system.ResourceVersionExposer" init-method="init"/>
+</beans>
